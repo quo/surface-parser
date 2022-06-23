@@ -4,6 +4,8 @@ import sys, math, os, stat, gzip, struct, io
 
 from surfacedata import *
 
+NAN = float('nan')
+
 
 # hierarchical dump
 
@@ -43,6 +45,42 @@ def print_struct(name, val, indent):
 
 
 # dft magnitude display
+
+def get_pos(r):
+	# assume the center component has the max amplitude
+	maxi = len(r.real)//2
+
+	# off-screen components are always zero, don't use them
+	mind = -.5
+	maxd = .5
+	if r.real[maxi-1] == 0 and r.imag[maxi-1] == 0:
+		maxi += 1
+		mind = -1
+	elif r.real[maxi+1] == 0 and r.imag[maxi+1] == 0:
+		maxi -= 1
+		maxd = 1
+
+	# get phase-aligned amplitudes of the three center components
+	amp = math.hypot(r.real[maxi], r.imag[maxi])
+	if amp < 50: return NAN
+	sin = r.real[maxi] / amp
+	cos = r.imag[maxi] / amp
+	x0 = (sin * r.real[maxi-1] + cos * r.imag[maxi-1])
+	x1 = amp
+	x2 = (sin * r.real[maxi+1] + cos * r.imag[maxi+1])
+
+	# convert the amplitudes into something we can fit a parabola to
+	EXP = -.7
+	x0 = x0 ** EXP if x0 > 0 else 0
+	x1 = x1 ** EXP if x1 > 0 else 0
+	x2 = x2 ** EXP if x2 > 0 else 0
+
+	# check orientation of fitted parabola
+	if x0 + x2 <= 2*x1: return NAN
+
+	# find critical point of fitted parabola
+	d = (x0 - x2) / (2 * (x0 - 2*x1 + x2))
+	return r.first + maxi + max(mind, min(maxd, d))
 
 class DftInfo: pass
 class DftPrinter:
@@ -99,6 +137,16 @@ class DftPrinter:
 			yield 'y'
 			for r in d.y: yield from self.get_row_text(r)
 			yield self.color(None)
+		if i.data_type == 6:
+			if d is None:
+				x0 = y0 = x1 = y1 = NAN
+			else:
+				x0 = get_pos(d.x[0])
+				y0 = get_pos(d.y[0])
+				x1 = get_pos(d.x[1])
+				y1 = get_pos(d.y[1])
+			for x in (x0, y0, x1-x0, y1-y0):
+				yield '%5i' % (x*100) if not math.isnan(x) else '     '
 		if i.data_type == 10:
 			b = self.get_bits(d, 0, i.num_rows)
 			yield '   ' if b is None else '=%02x' % b
