@@ -176,34 +176,34 @@ class Packet(Struct):
 		Struct.read(self, b)
 		with Block(b, self.size) as b:
 			if self.type == 0: self.data = PacketStart()
-			# 0x02 ?
+			# 0x02 ? 0x 00 00 00 xx xx 00 00
 			elif self.type == 0x03: self.data = PacketHeatmapDimensions()
-			# 0x04 FrequencyNoise
-			# 0x06 ?
-			# 0x07 ?
-			# 0x10 Stylus v1 TODO
-			# 0x12 ?
+			elif self.type == 0x04: self.data = PacketFrequencyNoise()
+			# 0x06 ? 00 00 00 00
+			# 0x07 ? 00 0x 00 00
+			elif self.type == 0x10: self.data = PacketStylusSimple()
+			# 0x12 ? nn 00 00 00 { u32, u32, u8[12]? }[n]
 			elif self.type == 0x25:
 				self.data = HeatmapData(b.read(b.remaining()))
 				return
-			# 0x32 ? aa bb 00 00 nn XX*n 5E
-			# 0x33 ?
-			# 0x51 ?
-			# 0x56 ? 
+			# 0x32 ? xx xx 00 00 nn xx[n] 5E
+			# 0x33 ? 0x xx 00 00 xx xx 0x xx xx xx 0x xx 00 00 00 00 00 00 00 00 00 00 00 00
+			# 0x51 ? 00 00 nn 00 0x 00 00 00 { mm 64 0x 00 xx xx xx xx, u32[m] }[n]
+			# 0x56 ? xx xx 0x xx + packet 0x51 data
 			elif self.type == 0x57: self.data = PacketPenGeneral()
 			# 0x58 PenJnrOutput
-			# 0x59 PenNoiseMetricsOutput
-			# 0x5a PenDataSelection
+			elif self.type == 0x59: self.data = PacketPenNoiseMetricsOutput()
+			elif self.type == 0x5a: self.data = PacketPenDataSelection()
 			elif self.type == 0x5b: self.data = PacketPenMagnitude()
 			elif self.type == 0x5c: self.data = PacketPenDftWindow()
 			# 0x5d PenMultipleRegion
-			# 0x5e PenTouchedAntennas
+			elif self.type == 0x5e: self.data = PacketPenTouchedAntennas()
 			elif self.type == 0x5f: self.data = PacketPenMetadata()
-			# 0x60 Stylus v2 TODO
-			# 0x61 Stylus without serial TODO
-			# 0x62 PenDetection
-			# 0x63 PenLift
-			# 0x74 ? SP7
+			elif self.type == 0x60: self.data = PacketStylusTiltSerial()
+			elif self.type == 0x61: self.data = PacketStylusTilt()
+			elif self.type == 0x62: self.data = PacketPenDetection()
+			elif self.type == 0x63: self.data = PacketPenLift()
+			# 0x74 ? 00 00 00 00 (SP7)
 			elif self.type == 0xff: self.data = PacketEnd()
 			#else: raise ParseError('unknown packet type %i at %i' % (self.type, b.f.tell()))
 			else: self.data = UnhandledData()
@@ -222,6 +222,71 @@ class PacketEnd(Struct):
 	(u16, 'num_packets'),
 	]
 
+class PacketStylusSimple(Struct):
+	fields = [
+	(u8, 'num_data'),
+	(u8[3], ''),
+	(u32, 'serial'),
+	]
+
+	def read(self, d):
+		Struct.read(self, d)
+		self.data = List(StylusDataSimple, self.num_data)
+		self.data.read(d)
+
+class PacketStylusTiltSerial(Struct):
+	fields = [
+	(u8, 'num_data'),
+	(u8[3], ''),
+	(u32, 'serial'),
+	]
+
+	def read(self, d):
+		Struct.read(self, d)
+		self.data = List(StylusDataTilt, self.num_data)
+		self.data.read(d)
+
+class PacketStylusTilt(Struct):
+	fields = [
+	(u8, 'num_data'),
+	(u8[3], ''),
+	]
+
+	def read(self, d):
+		Struct.read(self, d)
+		self.data = List(StylusDataTilt, self.num_data)
+		self.data.read(d)
+
+class StylusDataSimple(Struct):
+	fields = [
+	(u8[4], ''),
+	(u8, 'mode'),
+	(u16, 'x'),
+	(u16, 'y'),
+	(u16, 'pressure'),
+	(u8, ''),
+	]
+
+class StylusDataTilt(Struct):
+	fields = [
+	(u16, 'timestamp'),
+	(u16, 'mode'),
+	(u16, 'x'),
+	(u16, 'y'),
+	(u16, 'pressure'),
+	(u16, 'altitude'),
+	(u16, 'azimuth'),
+	(u8[2], ''),
+	]
+
+class PacketFrequencyNoise(Struct):
+	fields = [
+	(u8, ''), # always 8 (number of pairs?)
+	(u8, 'start'),
+	(u8[2], ''), # always 0
+	(u16[16], ''), # 8 pairs of value + sequential index, first index = start*8
+	]
+
 class PacketPenGeneral(Struct):
 	fields = [
 	(u16, 'timestamp'),
@@ -234,6 +299,34 @@ class PacketPenGeneral(Struct):
 	(i8[49], 'padding'), # -1
 	]
 
+class PacketPenNoiseMetricsOutput(Struct):
+	fields = [
+	(i16[32], ''),
+	]
+
+class PacketPenDataSelection(Struct):
+	fields = [
+	(u32[34], ''),
+	(i8[4], ''), # something x/y/x/y?
+	(i8, 'x0'), (i8, 'y0'), # center col/row of DFT data
+	(i8, 'x1'), (i8, 'y1'),
+	(u8, ''),
+	(u8, 'data_type'),
+	(u8, 'seq_num'),
+	(i8, 'padding'),
+	]
+
+class PacketPenTouchedAntennas(Struct):
+	fields = [
+	(u8[10], 'x_mask'), # bitmask of antennas touched by fingers in X direction
+	(i8, 'x'),
+	(i8, 'y'),
+	(u16, 'timestamp'),
+	(u8[7], 'y_mask'),
+	(u8[5], 'x_mask_copy'), # copy of first 5 bytes of x_mask
+	(i16, 'padding'), # -1
+	]
+
 class PacketPenMetadata(Struct):
 	fields = [
 	(u32, 'group_counter'), # increases by one for each group of pen packets
@@ -241,6 +334,23 @@ class PacketPenMetadata(Struct):
 	(u8, 'data_type'), # same as next DFT packet
 	(u8, ''), # alternates 0/1/2/0/1/etc for each group on SP7+, always 6 on SLS
 	(i8[9], 'padding'), # -1
+	]
+
+class PacketPenDetection(Struct):
+	fields = [
+	(u32, ''),
+	(u32, ''),
+	(u8[5], ''),
+	(u8, 'seq_num'),
+	(u8, 'data_type'),
+	(u8, 'flags'),
+	]
+
+class PacketPenLift(Struct):
+	fields = [
+	(i8, ''),
+	(i8, ''),
+	(i16, 'padding'), # -1
 	]
 
 class PacketHeatmapDimensions(Struct):
