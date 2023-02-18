@@ -181,7 +181,7 @@ class DftPrinter:
 
 # file formats
 
-FmtIthc, FmtIptsBin, FmtIptsTxt = range(3)
+FmtIthc, FmtIptsBin, FmtIptsTxt, FmtHidRaw = range(4)
 
 def read_buffers(f, fmt):
 	if fmt == FmtIptsTxt:
@@ -219,6 +219,12 @@ def read_buffers(f, fmt):
 				x = IptsData()
 				x.read(f)
 				yield x
+			elif fmt == FmtHidRaw:
+				buf = f.read1()
+				with Block(io.BytesIO(buf), len(buf)) as b:
+					x = HidReportInput()
+					x.read(b)
+					yield x
 		except EOFError:
 			if f.tell() == start: break
 			raise
@@ -233,6 +239,7 @@ def main(args):
 		elif a == '--ithc': fmt = FmtIthc
 		elif a == '--iptsbin': fmt = FmtIptsBin
 		elif a == '--iptstxt': fmt = FmtIptsTxt
+		elif a == '--hidraw': fmt = FmtHidRaw
 		else: raise Exception(a)
 	if fmt is None:
 		raise Exception('No format specified')
