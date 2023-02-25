@@ -8,6 +8,7 @@ You must specify one or more data files to parse. Files can be gzipped. It is po
 You must specify the input format using one of the following options:
 - `--hidraw`: Data read directly from `/dev/hidraw*` device.
 - `--ithc`: Data captured from legacy `/dev/ithc` device.
+- `--iptshid`: Data captured using HID-based `iptsd-dump`.
 - `--iptstxt`: Data captured using `ipts-dbg/ipts-dump`.
 - `--iptsbin`: Data captured using `ipts-dbg/ipts-dump --binary`.
 

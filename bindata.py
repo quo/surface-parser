@@ -12,6 +12,7 @@ class i8(Primitive): s = 'b'
 class u16(Primitive): s = 'H'
 class i16(Primitive): s = 'h'
 class u32(Primitive): s = 'I'
+class u64(Primitive): s = 'Q'
 class i32(Primitive): s = 'i'
 class f32(Primitive): s = 'f'
 

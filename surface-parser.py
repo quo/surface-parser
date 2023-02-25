@@ -181,7 +181,7 @@ class DftPrinter:
 
 # file formats
 
-FmtIthc, FmtIptsBin, FmtIptsTxt, FmtHidRaw = range(4)
+FmtIthc, FmtIptsBin, FmtIptsTxt, FmtIptsHid, FmtHidRaw = range(5)
 
 def read_buffers(f, fmt):
 	if fmt == FmtIptsTxt:
@@ -208,6 +208,10 @@ def read_buffers(f, fmt):
 						yield x
 					data = None
 		return
+	if fmt == FmtIptsHid:
+		iptshdr = IptsDumpHidHeader()
+		iptshdr.read(f)
+		yield iptshdr
 	while True:
 		start = f.tell()
 		try:
@@ -219,6 +223,10 @@ def read_buffers(f, fmt):
 				x = IptsData()
 				x.read(f)
 				yield x
+			elif fmt == FmtIptsHid:
+				x = IptsDumpHidData()
+				x.read(f, iptshdr.buffer_size)
+				yield x.data
 			elif fmt == FmtHidRaw:
 				buf = f.read1()
 				with Block(io.BytesIO(buf), len(buf)) as b:
@@ -239,6 +247,7 @@ def main(args):
 		elif a == '--ithc': fmt = FmtIthc
 		elif a == '--iptsbin': fmt = FmtIptsBin
 		elif a == '--iptstxt': fmt = FmtIptsTxt
+		elif a == '--iptshid': fmt = FmtIptsHid
 		elif a == '--hidraw': fmt = FmtHidRaw
 		else: raise Exception(a)
 	if fmt is None:

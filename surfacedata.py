@@ -15,6 +15,36 @@ class IthcApi(Struct):
 			self.data = IptsData()
 			self.data.read(b)
 
+class IptsDumpHidHeader(Struct):
+	fields = [
+	(u16, 'vendor'),
+	(u16, 'product'),
+	(u32, 'padding'),
+	(u64, 'buffer_size'),
+	(u8, 'has_meta'),
+	]
+
+	def read(self, b):
+		Struct.read(self, b)
+		if self.has_meta:
+			with Block(b, 105) as b:
+				# this is a dump of an iptsd struct, the format does not match the Metadata struct below
+				self.meta = UnhandledData()
+				self.meta.read(b)
+
+class IptsDumpHidData(Struct):
+	fields = [
+	(u64, 'size'),
+	]
+
+	def read(self, b, buffer_size):
+		Struct.read(self, b)
+		with Block(b, buffer_size) as b:
+			with Block(b, self.size) as d:
+				self.data = HidReportInput()
+				self.data.read(d)
+			b.read(b.remaining()) # junk
+
 class IptsData(Struct):
 	fields = [
 	(u32, 'type'),
