@@ -311,11 +311,15 @@ class StylusDataTilt(Struct):
 
 class PacketFrequencyNoise(Struct):
 	fields = [
-	(u8, ''), # always 8 (number of pairs?)
+	(u8, 'num'),
 	(u8, 'start'),
 	(u8[2], ''), # always 0
-	(u16[16], ''), # 8 pairs of value + sequential index, first index = start*8
 	]
+
+	def read(self, d):
+		Struct.read(self, d)
+		self.data = List(u16, self.num * 2) # pairs of value + sequential index, first index = start*8?
+		self.data.read(d)
 
 class PacketPenGeneral(Struct):
 	fields = [
